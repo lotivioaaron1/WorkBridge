@@ -97,41 +97,6 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/jobs/:jobId
- * Get single job listing details (public access)
- */
-router.get('/:jobId', async (req, res) => {
-  try {
-    const { jobId } = req.params;
-
-    if (!isValidUUID(jobId)) {
-      return res.status(400).json({ error: 'Invalid job ID' });
-    }
-
-    const result = await db.query(
-      `SELECT 
-        jl.id, jl.title, jl.description, jl.location, jl.salary_range,
-        jl.status, jl.created_at, jl.updated_at
-      FROM job_listings jl
-      JOIN users u ON jl.employer_id = u.id
-      WHERE jl.id = $1`,
-      [jobId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-
-    res.json({ job: result.rows[0] });
-  } catch (error) {
-    console.error('Get job details error:', error.message);
-    res.status(500).json({
-      error: 'Failed to fetch job details',
-    });
-  }
-});
-
 // ============================================================================
 // JOB SEEKER ROUTES (Authenticated job seekers only)
 // ============================================================================
@@ -235,7 +200,7 @@ router.get(
       const seekerId = req.user.userId;
 
       const result = await db.query(
-        `SELECT 
+        `SELECT
           a.id, a.job_id, a.status, a.created_at, a.updated_at,
           pgp_sym_decrypt(a.cover_note, $2)::text AS cover_letter,
           jl.title as job_title, jl.description as job_description, 
@@ -323,7 +288,8 @@ router.get(
       const employerId = req.user.userId;
 
       const result = await db.query(
-        `SELECT 
+        `
+          SELECT
           jl.id, jl.title, jl.description, jl.location, jl.salary_range,
           jl.status, jl.created_at, jl.updated_at,
           COUNT(a.id) as application_count
@@ -710,5 +676,41 @@ router.get(
     }
   }
 );
+
+/**
+ * GET /api/jobs/:jobId
+ * Get single job listing details (public access)
+ */
+router.get('/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    if (!isValidUUID(jobId)) {
+      return res.status(400).json({ error: 'Invalid job ID' });
+    }
+
+    const result = await db.query(
+      `
+        SELECT
+        jl.id, jl.title, jl.description, jl.location, jl.salary_range,
+        jl.status, jl.created_at, jl.updated_at
+      FROM job_listings jl
+      JOIN users u ON jl.employer_id = u.id
+      WHERE jl.id = $1`,
+      [jobId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    res.json({ job: result.rows[0] });
+  } catch (error) {
+    console.error('Get job details error:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch job details',
+    });
+  }
+});
 
 export default router;
